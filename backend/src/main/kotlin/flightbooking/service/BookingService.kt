@@ -6,6 +6,7 @@ import flightbooking.db.table.BookingsTable
 import flightbooking.db.table.FlightSchedulesTable
 import flightbooking.db.table.ModificationRequestsTable
 import flightbooking.db.table.PassengersTable
+import flightbooking.db.table.PaymentsTable
 import flightbooking.db.table.ScheduledFlightsTable
 import flightbooking.db.table.UsersTable
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -20,6 +21,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 object BookingService {
     private val json = Json {
@@ -91,6 +93,19 @@ object BookingService {
         val totalPrice: Double = 0.0,
         val passenger: Passenger? = null,
         val passengers: List<Passenger> = emptyList(),
+        val payment: PaymentDetails? = null,
+    )
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Serializable
+    @JsonIgnoreUnknownKeys
+    data class PaymentDetails(
+        val cardholderName: String = "",
+        val cardNumber: String = "",
+        val expiryMonth: Int? = null,
+        val expiryYear: Int? = null,
+        val cvv: String = "",
+        val billingPostalCode: String = "",
     )
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -183,6 +198,22 @@ object BookingService {
         BookingFlightsTable.insert { row ->
             row[BookingFlightsTable.bookingId] = bookingId
             row[BookingFlightsTable.flightId] = flightId
+        }
+
+        saveDummyPayment(
+            bookingId = bookingId,
+            amount = BigDecimal.valueOf(request.totalPrice).setScale(2),
+            payment = request.payment
+        )
+
+        val requestedUserId = request.userId?.takeIf { it > 0 }
+        if (requestedUserId != null) {
+            LoyaltyService.awardPointsForBooking(
+                userId = requestedUserId,
+                bookingId = bookingId,
+                totalPrice = request.totalPrice,
+                travelClass = request.travelClass,
+            )
         }
 
         hydrateBookingById(bookingId) ?: throw IllegalStateException("Booking was created but could not be loaded")
@@ -354,6 +385,40 @@ object BookingService {
             if (!exists) return candidate
             suffix += 1
         }
+    }
+
+    private fun saveDummyPayment(bookingId: Int, amount: BigDecimal, payment: PaymentDetails?) {
+        val normalizedCardNumber = payment?.cardNumber?.filter(Char::isDigit).orEmpty()
+        val cardLast4 = normalizedCardNumber.takeLast(4).ifBlank { "4242" }
+        val providerPaymentMethodId = "pm_dummy_${UUID.randomUUID().toString().replace("-", "").take(16)}"
+        val transactionReference = "txn_dummy_${UUID.randomUUID().toString().replace("-", "").take(18)}"
+
+        PaymentsTable.insert { row ->
+            row[PaymentsTable.bookingId] = bookingId
+            row[PaymentsTable.amount] = amount
+            row[PaymentsTable.paymentMethod] = "dummy_card"
+            row[PaymentsTable.paymentStatus] = "paid"
+            row[PaymentsTable.provider] = "dummy_gateway"
+            row[PaymentsTable.providerPaymentMethodId] = providerPaymentMethodId
+            row[PaymentsTable.cardholderName] = payment?.cardholderName?.trim().takeUnless { it.isNullOrBlank() } ?: "Demo Customer"
+            row[PaymentsTable.cardBrand] = detectCardBrand(normalizedCardNumber)
+            row[PaymentsTable.cardLast4] = cardLast4
+            row[PaymentsTable.expiryMonth] = payment?.expiryMonth
+            row[PaymentsTable.expiryYear] = payment?.expiryYear
+            row[PaymentsTable.billingPostalCode] = payment?.billingPostalCode?.trim().takeUnless { it.isNullOrBlank() }
+            row[PaymentsTable.isDummy] = true
+            row[PaymentsTable.transactionReference] = transactionReference
+            row[PaymentsTable.paymentDate] = LocalDateTime.now()
+        }
+    }
+
+    private fun detectCardBrand(cardNumber: String): String = when {
+        cardNumber.startsWith("4") -> "Visa"
+        cardNumber.startsWith("5") -> "Mastercard"
+        cardNumber.startsWith("34") || cardNumber.startsWith("37") -> "American Express"
+        cardNumber.startsWith("6") -> "Discover"
+        cardNumber.isBlank() -> "Dummy"
+        else -> "Other"
     }
 
     private fun hydrateBookingById(bookingId: Int): Booking? {

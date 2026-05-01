@@ -10,6 +10,8 @@ import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
+import org.mindrot.jbcrypt.BCrypt
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.LocalDateTime
@@ -82,7 +84,7 @@ object AuthService {
         LoyaltyAccountsTable.insert { row ->
             row[LoyaltyAccountsTable.userId] = userId
             row[pointsBalance] = 0
-            row[tier] = "silver"
+            row[tier] = "bronze"
         }
 
         val userRow = UsersTable.selectAll().first { it[UsersTable.id] == userId }
@@ -92,14 +94,22 @@ object AuthService {
     fun login(requestBody: String): AuthResponse = transaction {
         val request = json.decodeFromString<LoginRequest>(requestBody)
         val normalizedEmail = request.email.trim().lowercase()
-        val passwordHash = hashPassword(request.password.trim())
+        val password = request.password.trim()
 
         val userRow = UsersTable.selectAll().firstOrNull {
             it[UsersTable.email].equals(normalizedEmail, ignoreCase = true)
         } ?: throw IllegalArgumentException("Invalid email or password")
 
-        if (userRow[UsersTable.passwordHash] != passwordHash) {
+        val storedHash = userRow[UsersTable.passwordHash]
+        val isPasswordValid = verifyPassword(password, storedHash)
+        if (!isPasswordValid) {
             throw IllegalArgumentException("Invalid email or password")
+        }
+
+        if (storedHash != null && isLegacySha256Hash(storedHash)) {
+            UsersTable.update({ UsersTable.id eq userRow[UsersTable.id] }) { row ->
+                row[passwordHash] = hashPassword(password)
+            }
         }
 
         AuthResponse(
@@ -165,6 +175,22 @@ object AuthService {
     }
 
     private fun hashPassword(password: String): String {
+        return BCrypt.hashpw(password, BCrypt.gensalt())
+    }
+
+    private fun verifyPassword(password: String, storedHash: String?): Boolean {
+        if (storedHash.isNullOrBlank()) return false
+        return if (isLegacySha256Hash(storedHash)) {
+            legacySha256(password) == storedHash
+        } else {
+            runCatching { BCrypt.checkpw(password, storedHash) }.getOrDefault(false)
+        }
+    }
+
+    private fun isLegacySha256Hash(hash: String): Boolean =
+        hash.length == 64 && hash.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
+
+    private fun legacySha256(password: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(password.toByteArray(StandardCharsets.UTF_8))
         return digest.joinToString("") { "%02x".format(it) }
     }

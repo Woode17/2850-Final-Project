@@ -39,6 +39,7 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
     implementation("org.apache.commons:commons-csv:1.12.0")
+    implementation("org.mindrot:jbcrypt:0.4")
 
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test.junit)

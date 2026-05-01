@@ -1,6 +1,7 @@
 package flightbooking.service
 
 import flightbooking.db.table.AirportsTable
+import flightbooking.db.table.AircraftTable
 import flightbooking.db.table.FlightSchedulesTable
 import flightbooking.db.table.ScheduledFlightsTable
 import kotlinx.serialization.Serializable
@@ -14,6 +15,7 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeParseException
 import kotlin.math.roundToInt
 
@@ -74,6 +76,7 @@ object FlightService {
         }
 
         val airportsById = AirportsTable.selectAll().associateBy { it[AirportsTable.id] }
+        val aircraftSeatMap = AircraftTable.selectAll().associate { row -> row[AircraftTable.id] to row[AircraftTable.totalSeats] }
         scheduledFlightsQuery
             .mapNotNull { row ->
                 val schedule = schedulesById[row[ScheduledFlightsTable.scheduleId]] ?: return@mapNotNull null
@@ -86,7 +89,8 @@ object FlightService {
                     row = row,
                     schedule = schedule,
                     departureCode = departureCode,
-                    arrivalCode = arrivalCode
+                    arrivalCode = arrivalCode,
+                    totalSeats = aircraftSeatMap[row[ScheduledFlightsTable.aircraftId]] ?: 189
                 )
             }
             .sortedWith(compareBy<FlightResponse> { it.departureDate }.thenBy { it.departureTime }.thenBy { it.flightNumber })
@@ -96,10 +100,18 @@ object FlightService {
         row: ResultRow,
         schedule: ResultRow,
         departureCode: String,
-        arrivalCode: String
+        arrivalCode: String,
+        totalSeats: Int
     ): FlightResponse {
         val departureDateTime = row[ScheduledFlightsTable.departureTime]
         val arrivalDateTime = row[ScheduledFlightsTable.arrivalTime]
+        val availableSeats = row[ScheduledFlightsTable.availableSeats] ?: totalSeats
+        val dynamicPrice = calculateDynamicPrice(
+            basePrice = row[ScheduledFlightsTable.basePrice].toDouble(),
+            departureDateTime = departureDateTime,
+            availableSeats = availableSeats,
+            totalSeats = totalSeats
+        )
 
         return FlightResponse(
             id = row[ScheduledFlightsTable.id],
@@ -112,9 +124,47 @@ object FlightService {
             departureDate = departureDateTime.toLocalDate().toString(),
             duration = formatDuration(departureDateTime, arrivalDateTime),
             stops = schedule[FlightSchedulesTable.stops],
-            price = row[ScheduledFlightsTable.basePrice].toDouble().roundToInt(),
-            availableSeats = row[ScheduledFlightsTable.availableSeats] ?: 180
+            price = dynamicPrice.roundToInt(),
+            availableSeats = availableSeats
         )
+    }
+
+    private fun calculateDynamicPrice(
+        basePrice: Double,
+        departureDateTime: LocalDateTime,
+        availableSeats: Int,
+        totalSeats: Int
+    ): Double {
+        val now = LocalDateTime.now()
+        val hoursUntilDeparture = Duration.between(now, departureDateTime).toHours().coerceAtLeast(0)
+        val daysUntilDeparture = hoursUntilDeparture / 24.0
+        val seatsRatio = if (totalSeats <= 0) 1.0 else availableSeats.toDouble() / totalSeats.toDouble()
+
+        val timeMultiplier = when {
+            daysUntilDeparture > 60 -> 0.95
+            daysUntilDeparture > 30 -> 1.0
+            daysUntilDeparture > 14 -> 1.1
+            daysUntilDeparture > 7 -> 1.2
+            daysUntilDeparture > 3 -> 1.35
+            daysUntilDeparture >= 1 -> 1.55
+            else -> 1.8
+        }
+
+        val scarcityMultiplier = when {
+            seatsRatio <= 0.10 -> 1.35
+            seatsRatio <= 0.20 -> 1.20
+            seatsRatio <= 0.35 -> 1.10
+            else -> 1.0
+        }
+
+        val weekendMultiplier = when (departureDateTime.dayOfWeek) {
+            java.time.DayOfWeek.FRIDAY,
+            java.time.DayOfWeek.SATURDAY,
+            java.time.DayOfWeek.SUNDAY -> 1.05
+            else -> 1.0
+        }
+
+        return basePrice * timeMultiplier * scarcityMultiplier * weekendMultiplier
     }
 
     private fun formatDuration(

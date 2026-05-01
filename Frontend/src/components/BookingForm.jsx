@@ -17,7 +17,7 @@ export function BookingForm({ flight, onSubmit, submitting, submitError, onCance
   function handleSubmit(e) {
     e.preventDefault();
     onSubmit({
-      flightId: flight.id,
+      flightId: String(flight.id),
       passenger: form,
     });
   }

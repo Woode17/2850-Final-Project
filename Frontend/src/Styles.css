@@ -2212,6 +2212,55 @@ body {
 /* Payment */
 .payment-section { margin-bottom: 1.25rem; }
 .payment-section h3 { font-size: .9rem; font-weight: 700; margin-bottom: .85rem; }
+.saved-card-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(26, 109, 224, .05);
+  margin-bottom: 1rem;
+}
+.saved-card-meta {
+  margin-top: .25rem;
+  font-size: .84rem;
+  color: var(--muted);
+}
+.saved-card-actions {
+  display: flex;
+  gap: .5rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.saved-card-btn {
+  border: 1px solid var(--border);
+  background: var(--white);
+  color: var(--navy);
+  border-radius: 8px;
+  padding: .45rem .75rem;
+  cursor: pointer;
+}
+.saved-card-btn--danger {
+  color: #b42318;
+}
+.remember-card-label {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  font-size: .84rem;
+  cursor: pointer;
+  margin-top: .75rem;
+  color: var(--text);
+}
+.remember-card-label input {
+  margin-top: 2px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--sky);
+  cursor: pointer;
+}
 .payment-secure-note {
   font-size: .78rem;
   color: var(--muted);

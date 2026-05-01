@@ -205,15 +205,15 @@ fun Application.configureRouting() {
                     status = HttpStatusCode.Created,
                     message = BookingService.newBooking(requestBody)
                 )
-            } catch (_: SerializationException) {
+            } catch (e: SerializationException) {
                 call.respond(
                     status = HttpStatusCode.BadRequest,
-                    message = mapOf("error" to "Invalid booking payload")
+                    message = mapOf("error" to (e.message ?: "Invalid booking payload"))
                 )
-            } catch (_: IllegalArgumentException) {
+            } catch (e: IllegalArgumentException) {
                 call.respond(
                     status = HttpStatusCode.BadRequest,
-                    message = mapOf("error" to "Invalid booking payload")
+                    message = mapOf("error" to (e.message ?: "Invalid booking payload"))
                 )
             }
         }

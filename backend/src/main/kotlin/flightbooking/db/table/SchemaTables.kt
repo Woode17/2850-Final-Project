@@ -139,6 +139,15 @@ object PaymentsTable : Table("payments") {
     val amount = decimal("amount", 12, 2)
     val paymentMethod = varchar("payment_method", 64).nullable()
     val paymentStatus = varchar("payment_status", 32)
+    val provider = varchar("provider", 64).nullable()
+    val providerPaymentMethodId = varchar("provider_payment_method_id", 128).nullable()
+    val cardholderName = varchar("cardholder_name", 255).nullable()
+    val cardBrand = varchar("card_brand", 64).nullable()
+    val cardLast4 = varchar("card_last4", 4).nullable()
+    val expiryMonth = integer("expiry_month").nullable()
+    val expiryYear = integer("expiry_year").nullable()
+    val billingPostalCode = varchar("billing_postal_code", 32).nullable()
+    val isDummy = bool("is_dummy")
     val transactionReference = varchar("transaction_reference", 128).nullable()
     val paymentDate = datetime("payment_date")
     override val primaryKey = PrimaryKey(id)
@@ -183,6 +192,20 @@ object LoyaltyAccountsTable : Table("loyalty_accounts") {
     override val primaryKey = PrimaryKey(id)
 }
 
+object LoyaltyRewardsTable : Table("loyalty_rewards") {
+    val id = integer("id").autoIncrement()
+    val rewardCode = varchar("reward_code", 64).uniqueIndex()
+    val name = varchar("name", 255)
+    val description = text("description")
+    val pointsCost = integer("points_cost")
+    val benefitType = varchar("benefit_type", 64)
+    val benefitValue = varchar("benefit_value", 255).nullable()
+    val tierRequired = varchar("tier_required", 32)
+    val isActive = bool("is_active")
+    val createdAt = datetime("created_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
 object LoyaltyTransactionsTable : Table("loyalty_transactions") {
     val id = integer("id").autoIncrement()
     val loyaltyAccountId = reference("loyalty_account_id", LoyaltyAccountsTable.id, onDelete = ReferenceOption.CASCADE)
@@ -190,5 +213,18 @@ object LoyaltyTransactionsTable : Table("loyalty_transactions") {
     val pointsEarned = integer("points_earned")
     val pointsRedeemed = integer("points_redeemed")
     val transactionDate = datetime("transaction_date")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object LoyaltyRedemptionsTable : Table("loyalty_redemptions") {
+    val id = integer("id").autoIncrement()
+    val loyaltyAccountId = reference("loyalty_account_id", LoyaltyAccountsTable.id, onDelete = ReferenceOption.CASCADE)
+    val rewardId = reference("reward_id", LoyaltyRewardsTable.id, onDelete = ReferenceOption.RESTRICT)
+    val pointsSpent = integer("points_spent")
+    val status = varchar("status", 32)
+    val redemptionCode = varchar("redemption_code", 64).uniqueIndex()
+    val benefitDetails = text("benefit_details").nullable()
+    val redeemedAt = datetime("redeemed_at")
+    val expiresAt = datetime("expires_at").nullable()
     override val primaryKey = PrimaryKey(id)
 }
