@@ -126,11 +126,14 @@ function SeatMap({ selected, onSelect, travelClass, chosenByOthers = [] }) {
 }
 
 const EXTRAS_LIST = [
-  { id: "bag20",     label: "Extra 20kg hold bag",  price: 35, icon: "🧳" },
-  { id: "bag32",     label: "Extra 32kg hold bag",  price: 55, icon: "🧳" },
-  { id: "priority",  label: "Priority boarding",     price: 12, icon: "⚡" },
-  { id: "legroom",   label: "Extra legroom seat",   price: 25, icon: "💺" },
-  { id: "insurance", label: "Travel insurance",     price: 18, icon: "🛡"  },
+  { id: "bag20",     label: "Extra 20kg hold bag",  price: 35, icon: "Bag",      perPerson: false, desc: null },
+  { id: "bag32",     label: "Extra 32kg hold bag",  price: 55, icon: "Bag",      perPerson: false, desc: null },
+  { id: "priority",  label: "Priority boarding",    price: 12, icon: "Priority", perPerson: false, desc: null },
+  { id: "legroom",   label: "Extra legroom seat",   price: 25, icon: "Seat",     perPerson: false, desc: null },
+  {
+    id: "insurance", label: "Travel insurance", price: 18, icon: "Shield", perPerson: true,
+    desc: "Covers emergency medical (up to £10M), trip cancellation (up to £5,000), flight delays, lost baggage, and personal liability (up to £2M). 24/7 emergency assistance included.",
+  },
 ];
 
 // AuthPanel — module-level so inputs never lose focus
@@ -231,21 +234,6 @@ function paxLabel(pax, idx) {
 export function BookingFlowPage({ flight, onNavigate, onComplete }) {
   const { user } = useAuth();
   const [step, setStep] = useState(0);
-  if (!flight) {
-    return (
-      <div className="page booking-flow-page">
-        <div className="page-header">
-          <h1>Booking</h1>
-          <p>Select a flight before continuing to passenger details and payment.</p>
-        </div>
-        <div className="empty-state">
-          <span className="empty-icon">✈</span>
-          <p>Your booking selection could not be loaded.</p>
-          <button className="search-btn" onClick={() => onNavigate("home")}>Back to search</button>
-        </div>
-      </div>
-    );
-  }
 
   // ── Multi-passenger state ─────────────────────────────
   const [passengers, setPassengers] = useState(() => buildPassengers(flight, user));
@@ -280,7 +268,11 @@ export function BookingFlowPage({ flight, onNavigate, onComplete }) {
     const col = seatId.slice(-1);
     return sum + getSeatPrice(row, col, isBiz);
   }, 0);
-  const extrasCost = extras.reduce((s, id) => s + (EXTRAS_LIST.find(e => e.id === id)?.price || 0), 0);
+  const extrasCost = extras.reduce((s, id) => {
+    const ex = EXTRAS_LIST.find(e => e.id === id);
+    if (!ex) return s;
+    return s + (ex.perPerson ? ex.price * paxCount : ex.price);
+  }, 0);
   const total = baseFareTotal + seatCostTotal + extrasCost;
 
   function toggleExtra(id) {
@@ -557,12 +549,31 @@ export function BookingFlowPage({ flight, onNavigate, onComplete }) {
         <div className="extras-grid">
           {EXTRAS_LIST.map(extra => {
             const checked = extras.includes(extra.id);
+            const linePrice = extra.perPerson ? extra.price * paxCount : extra.price;
+            const isInsurance = extra.id === "insurance";
             return (
-              <div key={extra.id} className={`extra-card ${checked?"extra-card--selected":""}`} onClick={()=>toggleExtra(extra.id)}>
-                <span className="extra-icon">{extra.icon}</span>
+              <div key={extra.id}
+                className={`extra-card ${checked?"extra-card--selected":""} ${isInsurance?"extra-card--insurance":""}`}
+                onClick={()=>toggleExtra(extra.id)}>
+                <span className="extra-icon-label">{extra.icon}</span>
                 <div className="extra-info">
                   <span className="extra-label">{extra.label}</span>
-                  <span className="extra-price">+£{extra.price}</span>
+                  {extra.perPerson && paxCount > 1
+                    ? <span className="extra-price">+£{extra.price}/person &nbsp;<span className="extra-total">(£{linePrice} total)</span></span>
+                    : <span className="extra-price">+£{linePrice}</span>
+                  }
+                  {isInsurance && <span className="extra-per-person-note">£{extra.price} per person</span>}
+                  {extra.desc && <p className="extra-desc">{extra.desc}</p>}
+                  {isInsurance && (
+                    <a
+                      href="/leedsair-travel-insurance.pdf"
+                      download="LeedsAir-Travel-Insurance-Policy.pdf"
+                      className="insurance-download-link"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      Download full policy document (PDF)
+                    </a>
+                  )}
                 </div>
                 <div className={`extra-check ${checked?"checked":""}`}>{checked?"✓":"+"}</div>
               </div>

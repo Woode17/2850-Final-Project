@@ -2573,3 +2573,73 @@ body {
   .admin-table-row, .admin-table-row--clickable { grid-template-columns: 1fr 1fr; font-size: .82rem; }
   .bar-row { grid-template-columns: 90px 1fr 50px; }
 }
+
+/* ── Popular destinations — dynamic ─────────────────────── */
+.home-section-header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.25rem; }
+.home-section-badge { font-size: .78rem; color: var(--sky); font-weight: 600; background: #e8f0fe; padding: .2rem .65rem; border-radius: 20px; }
+.dest-card { cursor: pointer; position: relative; }
+.dest-card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(10,22,40,.13); }
+.dest-rank { position: absolute; top: .6rem; left: .6rem; font-size: .7rem; font-weight: 700; color: var(--sky); background: #e8f0fe; border-radius: 10px; padding: .1rem .4rem; }
+.dest-card--skeleton { background: linear-gradient(90deg, #e8eaf0 25%, #f4f6fb 50%, #e8eaf0 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; min-height: 80px; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ── ManageBookingPage ───────────────────────────────────── */
+.bdc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.manage-cancelled-note { color: var(--error); font-size: .9rem; margin-top: 1rem; font-style: italic; }
+.manage-action-panel { background: var(--white); border-radius: var(--radius); padding: 1.75rem; box-shadow: var(--shadow); border: 1.5px solid var(--border); margin-top: 1.5rem; }
+.manage-action-panel h3 { font-size: 1.2rem; font-weight: 700; color: var(--navy); margin-bottom: .5rem; }
+.manage-subtitle { font-size: .88rem; color: var(--muted); margin-bottom: 1.25rem; }
+.manage-action-btns { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
+
+/* Cancel warning */
+.cancel-warning { display: flex; gap: 1rem; background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 10px; padding: 1.25rem; margin: 1rem 0 1.5rem; }
+.cancel-warning-icon { width: 32px; height: 32px; border-radius: 50%; background: #ef4444; color: #fff; font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.cancel-warning p { margin: .3rem 0; font-size: .9rem; color: #7f1d1d; }
+.cancel-warning strong { color: #991b1b; }
+.cancel-confirm-btn { background: #ef4444; color: #fff; border: none; border-radius: 10px; padding: .75rem 1.5rem; font-weight: 700; cursor: pointer; font-size: .95rem; }
+.cancel-confirm-btn:hover { background: #dc2626; }
+.cancel-confirm-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Extras grid */
+.manage-extras-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .75rem; }
+
+/* Mini seat map */
+.mini-seat-map { max-height: 320px; overflow-y: auto; border: 1.5px solid var(--border); border-radius: 10px; padding: .75rem; background: var(--off); }
+.manage-seat-note { font-size: .85rem; color: var(--muted); margin-bottom: .75rem; }
+
+/* Cost summary box */
+.manage-cost-box { background: var(--off); border-radius: 10px; padding: 1rem 1.25rem; margin-top: 1.25rem; border: 1.5px solid var(--border); }
+.mcb-row { display: flex; justify-content: space-between; font-size: .9rem; padding: .3rem 0; color: var(--text); }
+.mcb-total { border-top: 1.5px solid var(--border); margin-top: .4rem; padding-top: .6rem; font-weight: 700; font-size: 1rem; color: var(--navy); }
+
+/* Modify date */
+.manage-date-row { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem; }
+.manage-flight-list { margin-top: 1rem; display: flex; flex-direction: column; gap: .75rem; }
+.manage-flight-list h4 { margin-bottom: .5rem; font-size: .95rem; color: var(--navy); }
+.manage-flight-option { display: grid; grid-template-columns: auto 1fr 1fr auto; gap: 1rem; align-items: center; background: var(--white); border: 1.5px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; cursor: pointer; transition: border-color .15s; }
+.manage-flight-option:hover { border-color: var(--sky); }
+.manage-flight-option--selected { border-color: var(--sky); background: #f0f6ff; }
+.mfo-times { display: flex; align-items: center; gap: .5rem; }
+.mfo-time { font-size: 1.1rem; font-weight: 700; color: var(--navy); }
+.mfo-arrow { color: var(--muted); }
+.mfo-meta { display: flex; flex-direction: column; gap: .2rem; font-size: .83rem; color: var(--muted); }
+.mfo-cost { font-size: .83rem; }
+.mfo-change-cost { font-weight: 700; color: var(--navy); }
+.mfo-breakdown { color: var(--muted); font-size: .78rem; margin-top: .2rem; }
+.mfo-select { padding: .4rem .9rem; border-radius: 8px; background: var(--sky); color: #fff; font-size: .83rem; font-weight: 600; white-space: nowrap; }
+.mfo-select--active { background: #059669; }
+
+@media (max-width: 600px) {
+  .manage-flight-option { grid-template-columns: 1fr 1fr; }
+  .mfo-cost { grid-column: 1 / -1; }
+  .mfo-select { grid-column: 1 / -1; text-align: center; }
+}
+
+/* ── Insurance extra card ─────────────────────────────────── */
+.extra-card--insurance { grid-column: 1 / -1; flex-direction: row; align-items: flex-start; }
+.extra-desc { font-size: .78rem; color: var(--muted); margin: .4rem 0 .35rem; line-height: 1.45; }
+.extra-per-person-note { font-size: .75rem; color: var(--sky); font-weight: 600; margin-top: .15rem; }
+.extra-total { font-size: .8rem; color: var(--muted); font-weight: 400; }
+.extra-icon-label { font-size: .7rem; font-weight: 700; color: var(--sky); background: #e8f0fe; border-radius: 6px; padding: .2rem .5rem; align-self: flex-start; white-space: nowrap; }
+.insurance-download-link { display: inline-block; margin-top: .5rem; font-size: .78rem; color: var(--sky); text-decoration: underline; cursor: pointer; }
+.insurance-download-link:hover { color: var(--navy); }

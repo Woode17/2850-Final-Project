@@ -69,8 +69,8 @@ function AppInner() {
             onComplete={handleBookingComplete}
           />
         );
-      case "bookings":        return <BookingsPage onNavigate={setPage} />;
-      case "manage":          return <ManageBookingPage />;
+      case "bookings":        return <BookingsPage />;
+      case "manage":          return <ManageBookingPage onNavigate={setPage} />;
       case "checkin":         return <CheckInPage />;
       case "login":           return <LoginPage onNavigate={setPage} />;
       case "register":        return <RegisterPage onNavigate={setPage} />;

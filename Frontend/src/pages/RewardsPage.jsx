@@ -4,15 +4,15 @@ import { LoadingSpinner, ErrorMessage } from "../components/StatusMessages";
 import { useAuth } from "../context/AuthContext";
 
 const REWARDS = [
-  { id: "voucher_10", label: "Â£10 Discount Voucher", points: 500, icon: "ðŸ·ï¸" },
-  { id: "voucher_25", label: "Â£25 Discount Voucher", points: 1200, icon: "ðŸ·ï¸" },
-  { id: "luggage",    label: "Free Extra Luggage",   points: 800,  icon: "ðŸ§³" },
-  { id: "upgrade",    label: "Seat Upgrade",         points: 1500, icon: "ðŸ’º" },
-  { id: "lounge",     label: "Airport Lounge Pass",  points: 2000, icon: "ðŸ›‹ï¸" },
+  { id: "voucher_10", label: "GBP10 Discount Voucher", display: "\u00a310 Discount Voucher", points: 500,  icon: "Tag"    },
+  { id: "voucher_25", label: "GBP25 Discount Voucher", display: "\u00a325 Discount Voucher", points: 1200, icon: "Tag"    },
+  { id: "luggage",    label: "Free Extra Luggage",      display: "Free Extra Luggage",        points: 800,  icon: "Bag"    },
+  { id: "upgrade",    label: "Seat Upgrade",            display: "Seat Upgrade",              points: 1500, icon: "Seat"   },
+  { id: "lounge",     label: "Airport Lounge Pass",     display: "Airport Lounge Pass",       points: 2000, icon: "Lounge" },
 ];
 
 export function RewardsPage({ onNavigate }) {
-  const { user, authLoading } = useAuth();
+  const { user } = useAuth();
   const [loyalty, setLoyalty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,20 +20,8 @@ export function RewardsPage({ onNavigate }) {
   const [redeemSuccess, setRedeemSuccess] = useState(null);
 
   useEffect(() => {
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
-
-    if (!user) {
-      setLoyalty(null);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
-    async function fetch() {
+    async function fetchLoyalty() {
       try {
         const data = await getLoyalty();
         if (!cancelled) setLoyalty(data);
@@ -43,9 +31,9 @@ export function RewardsPage({ onNavigate }) {
         if (!cancelled) setLoading(false);
       }
     }
-    fetch();
+    fetchLoyalty();
     return () => { cancelled = true; };
-  }, [authLoading, user]);
+  }, []);
 
   async function handleRedeem(reward) {
     setRedeeming(reward.id);
@@ -53,7 +41,7 @@ export function RewardsPage({ onNavigate }) {
     try {
       await redeemPoints({ rewardId: reward.id, pointsCost: reward.points });
       setLoyalty((prev) => ({ ...prev, points: prev.points - reward.points }));
-      setRedeemSuccess(`${reward.label} redeemed! Check your email.`);
+      setRedeemSuccess(reward.display + " redeemed! Check your email.");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -64,31 +52,24 @@ export function RewardsPage({ onNavigate }) {
   const points = loyalty?.points ?? user?.loyaltyPoints ?? 0;
   const tier = points >= 5000 ? "Gold" : points >= 2000 ? "Silver" : "Bronze";
   const tierColor = { Gold: "#f0a500", Silver: "#94a3b8", Bronze: "#b87333" }[tier];
+  const nextTierPts = tier === "Bronze" ? 2000 : tier === "Silver" ? 5000 : null;
 
   return (
     <div className="page rewards-page">
       <div className="page-header">
-        <h1>Loyalty & Rewards</h1>
+        <h1>Loyalty &amp; Rewards</h1>
         <p>Earn points every time you fly and redeem for great rewards.</p>
       </div>
 
       <div className="rewards-body">
-        {authLoading && <LoadingSpinner message="Restoring your rewards..." />}
-        {!authLoading && !user && !loading && (
-          <div className="empty-state">
-            <span className="empty-icon">â­</span>
-            <p>Sign in to view your points balance and redeem rewards.</p>
-            <button className="search-btn" onClick={() => onNavigate("login")}>Sign In</button>
-          </div>
-        )}
-        {!authLoading && loading && <LoadingSpinner message="Loading your rewards..." />}
-        {error && <ErrorMessage message={error} />}
+        {loading && <LoadingSpinner message="Loading your rewards..." />}
+        {error   && <ErrorMessage message={error} />}
 
-        {!authLoading && user && !loading && !error && (
+        {!loading && !error && (
           <>
             <div className="points-card">
               <div className="points-tier" style={{ color: tierColor }}>
-                â˜… {tier} Member
+                {tier} Member
               </div>
               <div className="points-value">{points.toLocaleString()}</div>
               <div className="points-label">Available Points</div>
@@ -108,17 +89,18 @@ export function RewardsPage({ onNavigate }) {
                   />
                 </div>
                 <span className="tier-next">
-                  {tier !== "Gold" && `${(tier === "Bronze" ? 2000 : 5000) - points} pts to ${tier === "Bronze" ? "Silver" : "Gold"}`}
-                  {tier === "Gold" && "Maximum tier reached!"}
+                  {nextTierPts
+                    ? `${nextTierPts - points} pts to ${tier === "Bronze" ? "Silver" : "Gold"}`
+                    : "Maximum tier reached!"}
                 </span>
               </div>
             </div>
 
             {redeemSuccess && (
               <div className="confirmation-banner" style={{ marginBottom: "1.5rem" }}>
-                <span className="confirm-icon">âœ“</span>
+                <span className="confirm-icon">+</span>
                 <p>{redeemSuccess}</p>
-                <button className="dismiss-btn" onClick={() => setRedeemSuccess(null)}>Ã—</button>
+                <button className="dismiss-btn" onClick={() => setRedeemSuccess(null)}>x</button>
               </div>
             )}
 
@@ -128,15 +110,19 @@ export function RewardsPage({ onNavigate }) {
                 const canAfford = points >= reward.points;
                 return (
                   <div key={reward.id} className={`reward-card ${!canAfford ? "reward-card--locked" : ""}`}>
-                    <span className="reward-icon">{reward.icon}</span>
-                    <h3 className="reward-name">{reward.label}</h3>
+                    <span className="reward-icon-label">{reward.icon}</span>
+                    <h3 className="reward-name">{reward.display}</h3>
                     <div className="reward-points">{reward.points.toLocaleString()} pts</div>
                     <button
                       className="redeem-btn"
                       disabled={!canAfford || redeeming === reward.id}
                       onClick={() => handleRedeem(reward)}
                     >
-                      {redeeming === reward.id ? "Redeeming..." : canAfford ? "Redeem" : "Not enough points"}
+                      {redeeming === reward.id
+                        ? "Redeeming..."
+                        : canAfford
+                        ? "Redeem"
+                        : "Not enough points"}
                     </button>
                   </div>
                 );
@@ -147,21 +133,21 @@ export function RewardsPage({ onNavigate }) {
               <h2>How to earn points</h2>
               <div className="earning-rules">
                 <div className="earning-rule">
-                  <span>âœˆ</span>
+                  <span className="earning-rule-icon">Economy</span>
                   <div>
                     <strong>Economy flights</strong>
-                    <p>Earn 1 point per Â£1 spent</p>
+                    <p>Earn 1 point per pound spent</p>
                   </div>
                 </div>
                 <div className="earning-rule">
-                  <span>ðŸ’º</span>
+                  <span className="earning-rule-icon">Business</span>
                   <div>
                     <strong>Business class</strong>
-                    <p>Earn 2 points per Â£1 spent (double bonus)</p>
+                    <p>Earn 2 points per pound spent (double bonus)</p>
                   </div>
                 </div>
                 <div className="earning-rule">
-                  <span>ðŸŽ</span>
+                  <span className="earning-rule-icon">Bonus</span>
                   <div>
                     <strong>First booking bonus</strong>
                     <p>500 bonus points on your first flight</p>
