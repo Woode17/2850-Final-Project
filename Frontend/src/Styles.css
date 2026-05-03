@@ -2212,55 +2212,6 @@ body {
 /* Payment */
 .payment-section { margin-bottom: 1.25rem; }
 .payment-section h3 { font-size: .9rem; font-weight: 700; margin-bottom: .85rem; }
-.saved-card-panel {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: .9rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: rgba(26, 109, 224, .05);
-  margin-bottom: 1rem;
-}
-.saved-card-meta {
-  margin-top: .25rem;
-  font-size: .84rem;
-  color: var(--muted);
-}
-.saved-card-actions {
-  display: flex;
-  gap: .5rem;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-.saved-card-btn {
-  border: 1px solid var(--border);
-  background: var(--white);
-  color: var(--navy);
-  border-radius: 8px;
-  padding: .45rem .75rem;
-  cursor: pointer;
-}
-.saved-card-btn--danger {
-  color: #b42318;
-}
-.remember-card-label {
-  display: flex;
-  align-items: flex-start;
-  gap: .6rem;
-  font-size: .84rem;
-  cursor: pointer;
-  margin-top: .75rem;
-  color: var(--text);
-}
-.remember-card-label input {
-  margin-top: 2px;
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  accent-color: var(--sky);
-  cursor: pointer;
-}
 .payment-secure-note {
   font-size: .78rem;
   color: var(--muted);
@@ -2692,3 +2643,19 @@ body {
 .extra-icon-label { font-size: .7rem; font-weight: 700; color: var(--sky); background: #e8f0fe; border-radius: 6px; padding: .2rem .5rem; align-self: flex-start; white-space: nowrap; }
 .insurance-download-link { display: inline-block; margin-top: .5rem; font-size: .78rem; color: var(--sky); text-decoration: underline; cursor: pointer; }
 .insurance-download-link:hover { color: var(--navy); }
+
+/* ── Complaints tab (admin) ───────────────────────────────── */
+.comp-table-header,
+.comp-table-row { grid-template-columns: 1fr 1fr 1fr 1.2fr 1fr .8fr !important; }
+.comp-category-badge { display: inline-block; padding: .15rem .55rem; border-radius: 12px; font-size: .75rem; font-weight: 600; background: #ede9fe; color: #5b21b6; }
+.comp-detail { border-bottom: 1.5px solid var(--border); }
+.comp-detail-header { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; font-size: .95rem; }
+.comp-description label { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; display: block; margin-bottom: .35rem; }
+.comp-description p { font-size: .9rem; color: var(--text); line-height: 1.55; background: var(--off); border-radius: 8px; padding: .75rem 1rem; border: 1px solid var(--border); }
+
+/* ── Name change notice ───────────────────────────────────── */
+.name-change-notice { background: #fffbeb; border: 1.5px solid #fcd34d; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
+.name-change-notice strong { color: #92400e; display: block; margin-bottom: .35rem; }
+.name-change-notice p { font-size: .87rem; color: #78350f; margin: 0; line-height: 1.5; }
+.name-change-current { display: flex; gap: .75rem; align-items: center; font-size: .9rem; color: var(--muted); background: var(--off); padding: .65rem 1rem; border-radius: 8px; border: 1px solid var(--border); margin-bottom: .25rem; }
+.name-change-current strong { color: var(--navy); }

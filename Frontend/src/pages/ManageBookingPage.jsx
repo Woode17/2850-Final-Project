@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { LoadingSpinner, ErrorMessage } from "../components/StatusMessages";
-import { getBookingByRef, cancelBooking, modifyBooking, getFlights } from "../services/api";
+import { getBookingByRef, cancelBooking, modifyBooking, requestModification, getFlights } from "../services/api";
 
 const ADMIN_FEE = 10;
 const INSURANCE_PRICE = 18;
@@ -417,6 +417,17 @@ function ModifyDateView({ booking, onConfirm, onBack, loading }) {
         </div>
       )}
 
+      {chosen && (
+        <div className="name-change-notice" style={{marginTop:"1rem"}}>
+          <strong>Admin approval required</strong>
+          <p>
+            Your booking will remain on the original date until a LeedsAir administrator approves this request.
+            Your booking status will show as <strong>Pending</strong> while the request is under review.
+            The change fee of <strong>£{calcChangeCost(chosen.price)}</strong> will be charged upon approval.
+          </p>
+        </div>
+      )}
+
       <div className="manage-action-btns">
         <button className="flow-back-btn" onClick={onBack} disabled={loading}>Go Back</button>
         <button className="flow-next-btn"
@@ -473,6 +484,7 @@ export function ManageBookingPage({ onNavigate }) {
   async function handleExtras({ extras, seat }) {
     setActionLoading(true);
     try {
+      // Extras and seat changes apply immediately — no approval needed
       await modifyBooking(booking.id, { extras, ...(seat ? { seat } : {}) });
       setBooking(prev => ({ ...prev, extras, seat: seat || prev.seat }));
       setView("detail");
@@ -487,16 +499,21 @@ export function ManageBookingPage({ onNavigate }) {
   async function handleNameChange({ passengerIndex, currentName, newFirstName, newLastName, reason }) {
     setActionLoading(true);
     try {
-      await modifyBooking(booking.id, {
+      // Name changes require admin approval — submitted as a modification request
+      await requestModification(booking.id, {
         requestType: "name_change",
-        description: `Name change request for passenger ${passengerIndex + 1}. ` +
-          `Current: "${currentName}" → Requested: "${newFirstName} ${newLastName}". ` +
-          `Reason: ${reason || "Not provided"}.`,
-        status: "Pending",
+        description: `Name change for passenger ${passengerIndex + 1}. Current: "${currentName}" -> Requested: "${newFirstName} ${newLastName}". Reason: ${reason || "Not provided"}.`,
+        newFirstName,
+        newLastName,
+        passengerIndex,
+        modificationRequested: "name_change",
+        modificationDescription: `Name change: ${currentName} -> ${newFirstName} ${newLastName}`,
       });
+      // Update local state to show Pending
+      setBooking(prev => ({ ...prev, status: "Pending" }));
       setView("detail");
       setSuccessMsg(
-        "Name change request submitted. An administrator will review your request and you will be notified by email once approved."
+        "Name change request submitted and is awaiting admin approval. Your booking status will show as Pending until approved."
       );
     } catch (err) {
       setError(err.message);
@@ -508,18 +525,25 @@ export function ManageBookingPage({ onNavigate }) {
   async function handleModifyDate({ flight, changeCost, newDate }) {
     setActionLoading(true);
     try {
-      await modifyBooking(booking.id, {
+      // Date changes require admin approval — submitted as a modification request
+      await requestModification(booking.id, {
         requestType: "date_change",
         description: `Date change to ${newDate}, flight ${flight.flightNumber}. Change fee: £${changeCost}`,
-        totalPrice: (booking.totalPrice || 0) + changeCost,
+        newDate,
+        newFlightNumber: flight.flightNumber,
+        changeCost,
+        modificationRequested: "date_change",
+        modificationDescription: `Date change to ${newDate} (£${changeCost} fee)`,
+        modificationRequestedAt: new Date().toISOString(),
       });
-      setBooking(prev => ({
-        ...prev,
-        totalPrice: (prev.totalPrice || 0) + changeCost,
-        flight: { ...prev.flight, departureDate: newDate, departureTime: flight.departureTime, flightNumber: flight.flightNumber },
-      }));
+      // Show booking as Pending — date does NOT change until admin approves
+      setBooking(prev => ({ ...prev, status: "Pending" }));
       setView("detail");
-      setSuccessMsg(`Flight changed to ${newDate}. £${changeCost} has been charged.`);
+      setSuccessMsg(
+        `Date change request submitted for ${newDate} (£${changeCost} change fee). ` +
+        `Your booking will remain on the original date until an administrator approves the change. ` +
+        `Your booking status now shows as Pending.`
+      );
     } catch (err) {
       setError(err.message);
     } finally {

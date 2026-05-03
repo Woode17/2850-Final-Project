@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { adminGetBookings, adminGetMetrics, adminGetReports } from "../services/api";
+import { adminGetBookings, adminGetMetrics, adminGetReports, getComplaints, adminGetModifications, adminApproveModification, adminRejectModification } from "../services/api";
 import { LoadingSpinner, ErrorMessage } from "../components/StatusMessages";
 
 // ── PRD §5 Admin Portal ───────────────────────────────────
@@ -69,7 +69,13 @@ function MetricCard({ value, label, icon, highlight }) {
 
 // ── Main component ────────────────────────────────────────
 export function AdminDashboardPage({ onNavigate }) {
-  const [tab,      setTab]      = useState("bookings");
+  const [tab,              setTab]              = useState("bookings");
+  const [complaints,       setComplaints]       = useState([]);
+  const [compLoading,      setCompLoading]      = useState(false);
+  const [expandedComp,     setExpandedComp]     = useState(null);
+  const [modRequests,      setModRequests]      = useState([]);
+  const [modLoading,       setModLoading]       = useState(false);
+  const [processingModId,  setProcessingModId]  = useState(null);
   const [bookings, setBookings] = useState([]);
   const [metrics,  setMetrics]  = useState(null);
   const [reports,  setReports]  = useState(null);
@@ -121,9 +127,75 @@ export function AdminDashboardPage({ onNavigate }) {
     return () => { cancelled = true; };
   }, [tab]);
 
+  // ── Reload modRequests every time modifications tab is opened ──
+  async function loadModRequests() {
+    setModLoading(true);
+    try {
+      const data = await adminGetModifications();
+      setModRequests(Array.isArray(data) ? data : []);
+    } catch {
+      setModRequests([]);
+    } finally {
+      setModLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (tab !== "modifications") return;
+    loadModRequests();
+  }, [tab]);
+
+  // ── Load complaints every time the Complaints tab is opened ──
+  useEffect(() => {
+    if (tab !== "complaints") return;
+    let cancelled = false;
+    setCompLoading(true);
+    getComplaints()
+      .then(data => { if (!cancelled) setComplaints(Array.isArray(data) ? data : []); })
+      .catch(() => { if (!cancelled) setComplaints([]); })
+      .finally(() => { if (!cancelled) setCompLoading(false); });
+    return () => { cancelled = true; };
+  }, [tab]);
+
   function handleLogout() {
     localStorage.removeItem("adminToken");
     onNavigate("home");
+  }
+
+  async function handleApprove(mod) {
+    setProcessingModId(mod.id);
+    try {
+      await adminApproveModification(mod);
+      // Immediately update local state so UI reflects change without reload
+      setModRequests(prev => prev.map(m =>
+        m.id === mod.id ? { ...m, status: "approved" } : m
+      ));
+      // Refresh bookings list so name/date changes show in bookings tab
+      const updated = await adminGetBookings();
+      setBookings(updated);
+    } catch (err) {
+      alert("Failed to approve: " + err.message);
+    } finally {
+      setProcessingModId(null);
+    }
+  }
+
+  async function handleReject(mod) {
+    setProcessingModId(mod.id);
+    try {
+      await adminRejectModification(mod);
+      // Immediately update local state
+      setModRequests(prev => prev.map(m =>
+        m.id === mod.id ? { ...m, status: "rejected" } : m
+      ));
+      // Refresh bookings to confirm status restored to Confirmed
+      const updated = await adminGetBookings();
+      setBookings(updated);
+    } catch (err) {
+      alert("Failed to reject: " + err.message);
+    } finally {
+      setProcessingModId(null);
+    }
   }
 
   // ── Filtered bookings (memo so it doesn't recalc on every render) ─
@@ -170,9 +242,10 @@ export function AdminDashboardPage({ onNavigate }) {
         </div>
         <div className="admin-tabs">
           {[
-            ["bookings",      "📋 Bookings"],
-            ["reports",       "📊 Reports"],
-            ["modifications", "✏️ Modifications"],
+            ["bookings",      "Bookings"],
+            ["reports",       "Reports"],
+            ["modifications", "Modifications"],
+            ["complaints",    "Complaints"],
           ].map(([key, label]) => (
             <button
               key={key}
@@ -180,8 +253,11 @@ export function AdminDashboardPage({ onNavigate }) {
               onClick={() => setTab(key)}
             >
               {label}
-              {key === "modifications" && modifications.length > 0 && (
-                <span className="admin-badge">{modifications.length}</span>
+              {key === "modifications" && modRequests.filter(m => m.status === "pending").length > 0 && (
+                <span className="admin-badge">{modRequests.filter(m => m.status === "pending").length}</span>
+              )}
+              {key === "complaints" && complaints.length > 0 && (
+                <span className="admin-badge" style={{background:"#7c3aed"}}>{complaints.length}</span>
               )}
             </button>
           ))}
@@ -419,6 +495,90 @@ export function AdminDashboardPage({ onNavigate }) {
         )}
 
         {/* ════════════════════════════════════════════════
+            TAB: COMPLAINTS
+            All complaints submitted by passengers.
+            Admins can read full details.
+           ════════════════════════════════════════════════ */}
+        {!loading && !error && tab === "complaints" && (
+          <div className="complaints-section">
+            <div className="reports-header-row">
+              <h2>Customer Complaints</h2>
+              <span className="admin-results-count">
+                <strong>{complaints.length}</strong> complaint{complaints.length !== 1 ? "s" : ""} total
+              </span>
+            </div>
+
+            {compLoading && <LoadingSpinner message="Loading complaints..." />}
+
+            {!compLoading && complaints.length === 0 && (
+              <div className="empty-state">
+                <span className="empty-icon">+</span>
+                <p>No complaints have been submitted yet.</p>
+              </div>
+            )}
+
+            {!compLoading && complaints.length > 0 && (
+              <div className="admin-table-wrapper">
+                <div className="admin-table-header comp-table-header">
+                  <span>Ref / ID</span>
+                  <span>Booking Ref</span>
+                  <span>Category</span>
+                  <span>Email</span>
+                  <span>Submitted</span>
+                  <span>Status</span>
+                </div>
+
+                {complaints.map(comp => {
+                  const compId = comp.id || comp.confirmationNumber || Math.random();
+                  const isExpanded = expandedComp === compId;
+                  return (
+                    <div key={compId}>
+                      <div
+                        className="admin-table-row comp-table-row admin-table-row--clickable"
+                        onClick={() => setExpandedComp(isExpanded ? null : compId)}
+                      >
+                        <span className="ref-value">{comp.confirmationNumber || comp.id || "—"}</span>
+                        <span>{comp.bookingReference || "—"}</span>
+                        <span>
+                          <span className="comp-category-badge">{comp.category || "General"}</span>
+                        </span>
+                        <span>{comp.contactEmail || comp.email || "—"}</span>
+                        <span>{comp.createdAt ? new Date(comp.createdAt).toLocaleDateString("en-GB") : "—"}</span>
+                        <span>
+                          <span className={`status-badge status-${(comp.status || "received").toLowerCase()}`}>
+                            {comp.status || "Received"}
+                          </span>
+                        </span>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="admin-row-detail comp-detail">
+                          <div className="comp-detail-header">
+                            <strong>Complaint Details</strong>
+                            <span className="comp-category-badge">{comp.category || "General"}</span>
+                          </div>
+                          <div className="comp-description">
+                            <label>Description</label>
+                            <p>{comp.description || "No description provided."}</p>
+                          </div>
+                          <div className="admin-detail-grid" style={{marginTop:".75rem"}}>
+                            <div><span>Confirmation No.</span><strong>{comp.confirmationNumber || "—"}</strong></div>
+                            <div><span>Booking Ref</span><strong>{comp.bookingReference || "—"}</strong></div>
+                            <div><span>Contact Email</span><strong>{comp.contactEmail || comp.email || "—"}</strong></div>
+                            <div><span>Submitted</span><strong>{comp.createdAt ? new Date(comp.createdAt).toLocaleString("en-GB") : "—"}</strong></div>
+                            <div><span>Status</span><strong>{comp.status || "Received"}</strong></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════
             TAB: MODIFICATIONS
             PRD §4.11: Monitor modification requests,
             admin approval workflow
@@ -427,50 +587,82 @@ export function AdminDashboardPage({ onNavigate }) {
           <div className="modifications-section">
             <h2>Modification Requests</h2>
             <p className="section-subtitle">
-              Bookings with pending change requests or awaiting admin approval.
+              Pending name change and date change requests requiring admin approval.
             </p>
 
-            {modifications.length === 0 ? (
+            {modLoading && <LoadingSpinner message="Loading modification requests..." />}
+
+            {!modLoading && modRequests.filter(m => m.status === "pending").length === 0 && (
               <div className="empty-state">
-                <span className="empty-icon">✓</span>
+                <span className="empty-icon">+</span>
                 <p>No pending modification requests.</p>
-              </div>
-            ) : (
-              <div className="admin-table-wrapper">
-                <div className="admin-table-header" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1.5fr"}}>
-                  <span>Reference</span>
-                  <span>Passenger</span>
-                  <span>Route</span>
-                  <span>Type</span>
-                  <span>Requested</span>
-                  <span>Actions</span>
-                </div>
-                {modifications.map(b => (
-                  <div className="admin-table-row" key={b.id || b.bookingReference}
-                    style={{gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr 1.5fr"}}>
-                    <span className="ref-value">{b.bookingReference || b.id}</span>
-                    <span>{b.passenger?.firstName} {b.passenger?.lastName}</span>
-                    <span>{b.flight?.from || b.from} → {b.flight?.to || b.to}</span>
-                    <span>{b.modificationRequested || "Pending"}</span>
-                    <span>{b.modificationRequestedAt ? new Date(b.modificationRequestedAt).toLocaleDateString("en-GB") : "—"}</span>
-                    <span className="admin-action-btns">
-                      <button className="admin-approve-btn">✓ Approve</button>
-                      <button className="admin-reject-btn">✗ Reject</button>
-                    </span>
-                  </div>
-                ))}
               </div>
             )}
 
-            {/* Track availability / cancellations / changes — PRD §5 */}
-            <div style={{marginTop:"2rem"}}>
-              <h3 style={{marginBottom:"1rem"}}>Change Tracking Summary</h3>
-              <div className="admin-metrics">
-                <MetricCard icon="✏️" value={bookings.filter(b => b.status === "Pending").length}    label="Pending Changes" />
-                <MetricCard icon="❌" value={bookings.filter(b => b.status === "Cancelled").length}  label="Cancellations" />
-                <MetricCard icon="✅" value={bookings.filter(b => b.checkedIn).length}               label="Checked In" />
-                <MetricCard icon="🎫" value={bookings.filter(b => b.status === "Confirmed").length}  label="Confirmed" />
+            {!modLoading && modRequests.length > 0 && (
+              <div className="admin-table-wrapper" style={{marginBottom:"2rem"}}>
+                <div className="admin-table-header mod-table-header">
+                  <span>Mod ID</span>
+                  <span>Booking Ref</span>
+                  <span>Type</span>
+                  <span>Details</span>
+                  <span>Requested</span>
+                  <span>Actions</span>
+                </div>
+                {modRequests.map(mod => {
+                  const isPending  = mod.status === "pending";
+                  const isProcessing = processingModId === mod.id;
+                  return (
+                    <div key={mod.id}>
+                      <div className="admin-table-row mod-table-row">
+                        <span className="ref-value">{mod.id}</span>
+                        <span>{mod.bookingReference || mod.bookingId || "—"}</span>
+                        <span>
+                          <span className="comp-category-badge">
+                            {mod.requestType === "date_change" ? "Date Change" : mod.requestType === "name_change" ? "Name Change" : mod.requestType}
+                          </span>
+                        </span>
+                        <span style={{fontSize:".8rem", color:"var(--muted)"}}>
+                          {mod.requestType === "date_change" && mod.newDate && `To: ${mod.newDate} (£${mod.changeCost} fee)`}
+                          {mod.requestType === "name_change" && `${mod.newFirstName || ""} ${mod.newLastName || ""}`}
+                          {!mod.newDate && !mod.newFirstName && (mod.description || "—")}
+                        </span>
+                        <span>{mod.createdAt ? new Date(mod.createdAt).toLocaleDateString("en-GB") : "—"}</span>
+                        <span className="admin-action-btns">
+                          {isPending ? (<>
+                            <button className="admin-approve-btn"
+                              disabled={isProcessing}
+                              onClick={() => handleApprove(mod)}>
+                              {isProcessing ? "..." : "Approve"}
+                            </button>
+                            <button className="admin-reject-btn"
+                              disabled={isProcessing}
+                              onClick={() => handleReject(mod)}>
+                              {isProcessing ? "..." : "Reject"}
+                            </button>
+                          </>) : (
+                            <span className={`status-badge status-${mod.status}`}>{mod.status}</span>
+                          )}
+                        </span>
+                      </div>
+                      {mod.description && (
+                        <div style={{padding:".5rem 1rem .75rem 1rem", background:"#f8faff", fontSize:".82rem", color:"var(--muted)", borderBottom:"1px solid var(--border)"}}>
+                          {mod.description}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+            )}
+
+            <h3 style={{marginBottom:"1rem"}}>Change Tracking Summary</h3>
+            <div className="admin-metrics">
+              <MetricCard value={modRequests.filter(m => m.status === "pending").length}  label="Pending" />
+              <MetricCard value={modRequests.filter(m => m.status === "approved").length} label="Approved" />
+              <MetricCard value={modRequests.filter(m => m.status === "rejected").length} label="Rejected" />
+              <MetricCard value={modRequests.filter(m => m.requestType === "date_change").length} label="Date Changes" />
+              <MetricCard value={modRequests.filter(m => m.requestType === "name_change").length} label="Name Changes" />
             </div>
           </div>
         )}

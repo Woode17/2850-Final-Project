@@ -116,6 +116,11 @@ object BookingService {
         val status: String? = null,
         val description: String? = null,
         val requestType: String? = null,
+        val newFirstName: String? = null,
+        val newLastName: String? = null,
+        val newDate: String? = null,
+        val newFlightNumber: String? = null,
+        val passengerIndex: Int? = null,
     )
 
     @Serializable
