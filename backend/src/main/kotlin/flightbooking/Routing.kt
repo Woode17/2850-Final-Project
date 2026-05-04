@@ -4,6 +4,7 @@ import flightbooking.service.AuthService
 import flightbooking.service.AdminService
 import flightbooking.service.BookingService
 import flightbooking.service.ComplaintService
+import flightbooking.service.AirportService
 import flightbooking.service.FlightService
 import flightbooking.service.HomeService
 import flightbooking.service.LoyaltyService
@@ -298,6 +299,23 @@ fun Application.configureRouting() {
             } catch (e: IllegalArgumentException) {
                 val status = if (e.message == "Booking not found") HttpStatusCode.NotFound else HttpStatusCode.BadRequest
                 call.respond(status, mapOf("error" to (e.message ?: "Unable to check in booking")))
+            }
+        }
+
+        get("/api/destinations") { //Get all destinations of an airport
+            val ref = call.parameters["from"]?.trim().orEmpty()
+            try {
+                call.respond(AirportService.returnDestinations(ref))
+            } catch (e: IllegalArgumentException) {
+                call.respond(status = HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Invalid return destinations")))
+            }
+        }
+
+        get("/api/airports") { //Get all available airports
+            try {
+                call.respond(AirportService.returnDepartureAirports())
+            } catch (e: IllegalArgumentException) {
+                call.respond(status = HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "Invalid return destinations")))
             }
         }
     }
