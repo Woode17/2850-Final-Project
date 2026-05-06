@@ -2,31 +2,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { buildApiUrl } from "../services/api";
 
 // ── Airport data ──────────────────────────────────────────
-const AIRPORTS = [
-  { code: "LBA", name: "Leeds Bradford Airport",       city: "Leeds",       country: "UK",          flag: "🇬🇧" },
-  { code: "LHR", name: "Heathrow Airport",              city: "London",      country: "UK",          flag: "🇬🇧" },
-  { code: "LGW", name: "Gatwick Airport",               city: "London",      country: "UK",          flag: "🇬🇧" },
-  { code: "MAN", name: "Manchester Airport",            city: "Manchester",  country: "UK",          flag: "🇬🇧" },
-  { code: "EDI", name: "Edinburgh Airport",             city: "Edinburgh",   country: "UK",          flag: "🇬🇧" },
-  { code: "BHX", name: "Birmingham Airport",            city: "Birmingham",  country: "UK",          flag: "🇬🇧" },
-  { code: "BRS", name: "Bristol Airport",               city: "Bristol",     country: "UK",          flag: "🇬🇧" },
-  { code: "NCL", name: "Newcastle Airport",             city: "Newcastle",   country: "UK",          flag: "🇬🇧" },
-  { code: "AMS", name: "Amsterdam Schiphol",            city: "Amsterdam",   country: "Netherlands", flag: "🇳🇱" },
-  { code: "CDG", name: "Charles de Gaulle Airport",    city: "Paris",       country: "France",      flag: "🇫🇷" },
-  { code: "BCN", name: "Barcelona El Prat",             city: "Barcelona",   country: "Spain",       flag: "🇪🇸" },
-  { code: "MAD", name: "Adolfo Suarez Madrid-Barajas", city: "Madrid",      country: "Spain",       flag: "🇪🇸" },
-  { code: "FCO", name: "Leonardo da Vinci Airport",    city: "Rome",        country: "Italy",       flag: "🇮🇹" },
-  { code: "MXP", name: "Milan Malpensa Airport",       city: "Milan",       country: "Italy",       flag: "🇮🇹" },
-  { code: "FRA", name: "Frankfurt Airport",             city: "Frankfurt",   country: "Germany",     flag: "🇩🇪" },
-  { code: "MUC", name: "Munich Airport",                city: "Munich",      country: "Germany",     flag: "🇩🇪" },
-  { code: "DXB", name: "Dubai International Airport",  city: "Dubai",       country: "UAE",         flag: "🇦🇪" },
-  { code: "JFK", name: "John F. Kennedy Airport",      city: "New York",    country: "USA",         flag: "🇺🇸" },
-  { code: "LAX", name: "Los Angeles Airport",          city: "Los Angeles", country: "USA",         flag: "🇺🇸" },
-  { code: "DUB", name: "Dublin Airport",               city: "Dublin",      country: "Ireland",     flag: "🇮🇪" },
-  { code: "CPH", name: "Copenhagen Airport",           city: "Copenhagen",  country: "Denmark",     flag: "🇩🇰" },
-  { code: "LIS", name: "Humberto Delgado Airport",     city: "Lisbon",      country: "Portugal",    flag: "🇵🇹" },
-  { code: "ATH", name: "Athens International Airport", city: "Athens",      country: "Greece",      flag: "🇬🇷" },
-];
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS   = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -78,6 +53,7 @@ function useMonthPrices(from, to, year, month) {
 
 // ── AirportPicker ─────────────────────────────────────────
 function AirportPicker({ label, value, onChange, exclude }) {
+  const [AIRPORTS, setAIRPORTS] = useState([]);
   const [query,   setQuery]  = useState("");
   const [open,    setOpen]   = useState(false);
   const wrapRef              = useRef(null);
@@ -91,6 +67,20 @@ function AirportPicker({ label, value, onChange, exclude }) {
     return a.code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q) ||
            a.city.toLowerCase().includes(q) || a.country.toLowerCase().includes(q);
   });
+
+  useEffect(() => {
+    const fetchAirports = async () => {
+      try {
+        const res = await fetch("/api/airports");
+        const data = await res.json();
+        setAIRPORTS(data);
+      } catch (err) {
+        console.error("Failed to load airports:", err);
+      }
+    };
+
+    fetchAirports();
+  }, []);
 
   useEffect(() => {
     function handle(e) {
