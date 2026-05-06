@@ -303,7 +303,7 @@ fun Application.configureRouting() {
         }
 
         get("/api/destinations") { //Get all destinations of an airport
-            val ref = call.parameters["from"]?.trim().orEmpty()
+            val ref = call.parameters["from"]?.trim()
             try {
                 call.respond(AirportService.returnDestinations(ref))
             } catch (e: IllegalArgumentException) {

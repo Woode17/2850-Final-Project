@@ -9,15 +9,17 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 @Serializable
 data class Destination(
-    val departure: String,
-    val departureId: Int,
-    val arrival: String,
-    val arrivalId: Int,
+    val departureAirport: String,
+    val departureAirportId: Int,
+    val arrivalAirport: String,
+    val arrivalAirportId: Int,
 )
 @Serializable
 data class Departure(
     val code: String,
+    val name: String,
     val city: String,
+    val country: String,
     val flag: String,
 )
 
@@ -30,7 +32,7 @@ object AirportService {
 
         for (schedule in schedules) {
             val airport = airportMap[schedule.from.trim().uppercase()] ?: continue
-            departures.add(Departure(airport.iata_code.trim().uppercase(), airport.municipality.trim(), airport.iso_country.trim().uppercase()))
+            departures.add(Departure(airport.iata_code.trim().uppercase(), airport.name.trim(), airport.municipality.trim(), airport.iso_country.trim().uppercase(),airport.iso_country.trim().uppercase()))
         }
 
         return departures.toList()
@@ -56,11 +58,11 @@ object AirportService {
             val arrAirport = airportsById[arrId] ?: return@mapNotNull null
 
             Destination(
-                departure = depAirport[AirportsTable.code],
-                departureId = depId,
-                arrival = arrAirport[AirportsTable.code],
-                arrivalId = arrId
+                departureAirport = depAirport[AirportsTable.code],
+                departureAirportId = depId,
+                arrivalAirport = arrAirport[AirportsTable.code],
+                arrivalAirportId = arrId
             )
-        }.distinctBy { it.departureId to it.arrivalId }  //Prevents duplicate flights
+        }.distinctBy { it.departureAirportId to it.arrivalAirportId }  //Prevents duplicate flights
     }
 }
