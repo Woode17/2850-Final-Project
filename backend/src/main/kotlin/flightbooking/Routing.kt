@@ -157,6 +157,14 @@ fun Application.configureRouting() {
             }
         }
 
+        get("/api/admin/complaints") {
+            try {
+                call.respond(AdminService.getComplaints(call.request.headers["Authorization"]))
+            } catch (e: IllegalArgumentException) {
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to (e.message ?: "Unauthorized")))
+            }
+        }
+
         post("/api/admin/modification-requests/{id}/decision") {
             val requestId = call.parameters["id"]?.toIntOrNull()
             if (requestId == null) {

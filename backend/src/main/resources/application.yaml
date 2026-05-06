@@ -6,9 +6,9 @@ ktor:
         port: 8080
 
 database:
-    jdbcUrl: ${?DB_JDBC_URL}
-    username: ${?DB_USER}
-    password: ${?DB_PASSWORD}
+    jdbcUrl: "jdbc:postgresql://aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
+    username: "postgres.ldjdhvytfyxaqmdebvco"
+    password: "0VS5oiDFa9NaLN3V"
     driverClassName: org.postgresql.Driver
     maximumPoolSize: 10
 

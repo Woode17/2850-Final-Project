@@ -136,6 +136,10 @@ export async function adminGetMetrics() {
   return adminRequest("/admin/metrics");
 }
 
+export async function adminGetComplaints() {
+  return adminRequest("/admin/complaints");
+}
+
 export async function adminResolveModificationRequest(requestId, data) {
   return adminRequest(`/admin/modification-requests/${requestId}/decision`, {
     method: "POST",

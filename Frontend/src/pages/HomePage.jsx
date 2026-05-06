@@ -28,18 +28,7 @@ const AIRPORTS = {
   ATH: { city: "Athens", flag: "GR" },
 };
 
-const FALLBACK = [
-  { code: "BCN", city: "Barcelona", flag: "ES", price: 89 },
-  { code: "AMS", city: "Amsterdam", flag: "NL", price: 65 },
-  { code: "DXB", city: "Dubai", flag: "AE", price: 299 },
-  { code: "CDG", city: "Paris", flag: "FR", price: 74 },
-];
-
-const INSPIRATION_CARDS = [
-  { title: "Weekend city break", route: "LBA to Amsterdam", blurb: "Short-haul favourites with easy Friday-to-Sunday timings.", to: "AMS" },
-  { title: "Best for sunshine", route: "LBA to Barcelona", blurb: "Warm-weather escapes that still feel affordable.", to: "BCN" },
-  { title: "Long-haul standout", route: "LBA to Dubai", blurb: "A higher-value trip when you want a bigger experience.", to: "DXB" },
-];
+const DEFAULT_CODES = ["AMS", "BCN", "CDG", "DUB", "MAD", "FCO"];
 
 function destCode(routeStr) {
   const parts = routeStr.split(/→|->/).map((value) => value.trim());
@@ -59,62 +48,75 @@ function buildSearchPayload(to, travelClass = "economy") {
   };
 }
 
+function buildInspirationBlurb(city, index) {
+  const blurbs = [
+    `A strong short-haul option if you want an easy getaway to ${city}.`,
+    `${city} is a good pick when you want a quick break without overthinking the route.`,
+    `Browse fares to ${city} if you want a popular route with proven demand.`,
+  ];
+  return blurbs[index] || `Start with ${city} if you want an easy place to begin searching.`;
+}
+
+async function getDestinationCard(code, bookingCount = null) {
+  if (!code || !AIRPORTS[code]) return null;
+
+  try {
+    const flights = await getFlights({ from: "LBA", to: code });
+    if (!flights?.length) return null;
+
+    const prices = flights.map((flight) => flight.price).filter((price) => typeof price === "number");
+    return {
+      code,
+      city: AIRPORTS[code].city,
+      flag: AIRPORTS[code].flag,
+      price: prices.length ? Math.min(...prices) : null,
+      bookingCount,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function HomePage({ onSearch, confirmedBooking, onDismissConfirmation }) {
-  const [destinations, setDestinations] = useState(FALLBACK);
+  const [destinations, setDestinations] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadPopular() {
+      setLoading(true);
+
       try {
         const reports = await adminGetReports();
         const seenDestinations = new Set();
-        const topRoutes = (reports.popularRoutes || [])
-          .filter(({ route }) => {
-            const code = destCode(route);
+        const popularCodes = (reports.popularRoutes || [])
+          .map(({ route, count }) => ({ code: destCode(route), count }))
+          .filter(({ code }) => {
             if (!code || seenDestinations.has(code)) return false;
             seenDestinations.add(code);
-            return true;
+            return Boolean(AIRPORTS[code]);
           })
-          .slice(0, 4);
+          .slice(0, 6);
 
-        if (!topRoutes.length) {
-          if (!cancelled) setLoading(false);
-          return;
+        let cards = (await Promise.all(
+          popularCodes.map(({ code, count }) => getDestinationCard(code, count))
+        )).filter(Boolean);
+
+        if (!cards.length) {
+          cards = (await Promise.all(DEFAULT_CODES.map((code) => getDestinationCard(code)))).filter(Boolean);
         }
 
-        const cards = await Promise.all(
-          topRoutes.map(async ({ route, count }) => {
-            const code = destCode(route);
-            if (!code || !AIRPORTS[code]) return null;
-
-            let price = null;
-            try {
-              const flights = await getFlights({ to: code });
-              const prices = flights.map((flight) => flight.price).filter(Boolean);
-              if (prices.length) price = Math.min(...prices);
-            } catch {
-              price = null;
-            }
-
-            return {
-              code,
-              city: AIRPORTS[code].city,
-              flag: AIRPORTS[code].flag,
-              price,
-              bookingCount: count,
-            };
-          })
-        );
-
         if (!cancelled) {
-          const valid = cards.filter(Boolean);
-          if (valid.length) setDestinations(valid);
+          setDestinations(cards.slice(0, 4));
           setLoading(false);
         }
       } catch {
-        if (!cancelled) setLoading(false);
+        const fallbackCards = (await Promise.all(DEFAULT_CODES.map((code) => getDestinationCard(code)))).filter(Boolean);
+        if (!cancelled) {
+          setDestinations(fallbackCards.slice(0, 4));
+          setLoading(false);
+        }
       }
     }
 
@@ -126,6 +128,19 @@ export function HomePage({ onSearch, confirmedBooking, onDismissConfirmation }) 
     return [...destinations]
       .filter((destination) => typeof destination.price === "number")
       .sort((a, b) => a.price - b.price)[0] || null;
+  }, [destinations]);
+
+  const discoveryCodes = useMemo(() => {
+    return destinations.slice(0, 4).map((destination) => destination.code);
+  }, [destinations]);
+
+  const inspirationCards = useMemo(() => {
+    return destinations.slice(0, 3).map((destination, index) => ({
+      title: index === 0 ? "Popular right now" : index === 1 ? "Good for a city break" : "Worth exploring",
+      route: `LBA to ${destination.city}`,
+      blurb: buildInspirationBlurb(destination.city, index),
+      to: destination.code,
+    }));
   }, [destinations]);
 
   return (
@@ -142,7 +157,7 @@ export function HomePage({ onSearch, confirmedBooking, onDismissConfirmation }) 
             <h2 className="home-section-title">Popular destinations</h2>
             <p className="home-section-copy">Browse the places customers are booking most right now.</p>
           </div>
-          {!loading && <span className="home-section-badge">Based on recent bookings</span>}
+          {!loading && destinations.length > 0 && <span className="home-section-badge">Based on recent bookings</span>}
         </div>
 
         <div className="dest-grid">
@@ -165,11 +180,15 @@ export function HomePage({ onSearch, confirmedBooking, onDismissConfirmation }) 
               {destination.bookingCount ? (
                 <span className="dest-meta">{destination.bookingCount} recent bookings</span>
               ) : (
-                <span className="dest-meta">Inspiration pick</span>
+                <span className="dest-meta">Available route</span>
               )}
             </div>
           ))}
         </div>
+
+        {!loading && destinations.length === 0 && (
+          <p className="muted-text">No live destination recommendations are available right now.</p>
+        )}
       </div>
 
       <div className="home-discovery-grid">
@@ -179,11 +198,12 @@ export function HomePage({ onSearch, confirmedBooking, onDismissConfirmation }) 
           <p>
             {bestValueDestination
               ? `Our lowest currently surfaced fare is for ${bestValueDestination.city}, making it a strong pick for a low-cost getaway.`
-              : "Browse trending destinations to spot the best-value route for your next trip."}
+              : "Browse live destinations to spot the best-value route for your next trip."}
           </p>
           <button
             className="quick-action-btn"
-            onClick={() => onSearch(buildSearchPayload(bestValueDestination?.code || "AMS"))}
+            onClick={() => bestValueDestination && onSearch(buildSearchPayload(bestValueDestination.code))}
+            disabled={!bestValueDestination}
           >
             Explore best value
           </button>
@@ -194,7 +214,7 @@ export function HomePage({ onSearch, confirmedBooking, onDismissConfirmation }) 
           <h3>Not sure where to go yet?</h3>
           <p>Use the destination ideas below to jump straight into a search without filling every field first.</p>
           <div className="discovery-chip-row">
-            {["AMS", "BCN", "CDG", "DXB"].map((code) => (
+            {discoveryCodes.map((code) => (
               <button key={code} className="discovery-chip" onClick={() => onSearch(buildSearchPayload(code))}>
                 {code}
               </button>
@@ -211,8 +231,8 @@ export function HomePage({ onSearch, confirmedBooking, onDismissConfirmation }) 
           </div>
         </div>
         <div className="inspiration-grid">
-          {INSPIRATION_CARDS.map((card) => (
-            <div key={card.title} className="inspiration-card">
+          {inspirationCards.map((card) => (
+            <div key={card.title + card.to} className="inspiration-card">
               <span className="booking-card-eyebrow">{card.route}</span>
               <h3>{card.title}</h3>
               <p>{card.blurb}</p>

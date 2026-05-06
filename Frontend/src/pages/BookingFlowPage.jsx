@@ -7,6 +7,7 @@ import { RouteMap } from "../components/RouteMap";
 
 const MAX_PASSENGERS = 7;
 const SAVED_CARD_STORAGE_KEY = "leedsair_saved_card";
+const INSURANCE_PDF = "/LeedsAir-Travel-Insurance-Policy.pdf";
 
 const FLOW_STEPS = ["Flight summary", "Passenger details", "Seats", "Extras", "Review & Pay"];
 
@@ -673,6 +674,13 @@ export function BookingFlowPage({ flight, onNavigate, onComplete }) {
                 <div className="extra-info">
                   <span className="extra-label">{extra.label}</span>
                   <span className="extra-price">+£{extra.price}</span>
+                  {extra.id === "insurance" && (
+                    <small>
+                      Covers cancellation, delays and lost baggage.{" "}
+                      <a href={INSURANCE_PDF} target="_blank" rel="noreferrer">View policy PDF</a>{" · "}
+                      <a href={INSURANCE_PDF} download>Download PDF</a>
+                    </small>
+                  )}
                 </div>
                 <div className={`extra-check ${checked?"checked":""}`}>{checked?"✓":"+"}</div>
               </div>

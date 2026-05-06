@@ -2,6 +2,9 @@ package flightbooking.service
 
 import flightbooking.db.table.LoyaltyAccountsTable
 import flightbooking.db.table.ModificationRequestsTable
+import flightbooking.db.table.ComplaintsTable
+import flightbooking.db.table.BookingsTable
+import flightbooking.db.table.UsersTable
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -93,6 +96,18 @@ object AdminService {
     data class ModificationDecisionRequest(
         val decision: String = "",
         val note: String = "",
+    )
+
+    @Serializable
+    data class AdminComplaint(
+        val id: Int,
+        val bookingReference: String? = null,
+        val customerName: String,
+        val customerEmail: String? = null,
+        val subject: String? = null,
+        val message: String? = null,
+        val status: String,
+        val createdAt: String,
     )
 
     fun login(requestBody: String): AdminLoginResponse {
@@ -233,6 +248,38 @@ object AdminService {
         )
     }
 
+    fun getComplaints(authorizationHeader: String?): List<AdminComplaint> {
+        requireAdmin(authorizationHeader)
+        return transaction {
+            val usersById = UsersTable.selectAll().associateBy { it[UsersTable.id] }
+            val bookingsById = BookingsTable.selectAll().associateBy { it[BookingsTable.id] }
+
+            ComplaintsTable.selectAll()
+                .sortedByDescending { it[ComplaintsTable.createdAt] }
+                .map { row ->
+                    val user = usersById[row[ComplaintsTable.userId]]
+                    val bookingReference = row[ComplaintsTable.bookingId]?.let { bookingId ->
+                        bookingsById[bookingId]?.get(BookingsTable.bookingReference)
+                    }
+                    val customerName = listOfNotNull(
+                        user?.get(UsersTable.firstName)?.takeIf { it.isNotBlank() },
+                        user?.get(UsersTable.lastName)?.takeIf { it.isNotBlank() },
+                    ).joinToString(" ").ifBlank { "Guest customer" }
+
+                    AdminComplaint(
+                        id = row[ComplaintsTable.id],
+                        bookingReference = bookingReference,
+                        customerName = customerName,
+                        customerEmail = user?.get(UsersTable.email),
+                        subject = row[ComplaintsTable.subject],
+                        message = row[ComplaintsTable.message],
+                        status = row[ComplaintsTable.status].replaceFirstChar { it.uppercase() },
+                        createdAt = row[ComplaintsTable.createdAt].toString(),
+                    )
+                }
+        }
+    }
+
     fun resolveModificationRequest(authorizationHeader: String?, requestId: Int, requestBody: String): BookingService.Booking {
         requireAdmin(authorizationHeader)
         val request = json.decodeFromString<ModificationDecisionRequest>(requestBody)
@@ -241,7 +288,7 @@ object AdminService {
             throw IllegalArgumentException("Decision must be either approved or rejected")
         }
 
-        val bookingId = transaction {
+        val resolved = transaction {
             val requestRow = ModificationRequestsTable.selectAll()
                 .firstOrNull { it[ModificationRequestsTable.id] == requestId }
                 ?: throw IllegalArgumentException("Modification request not found")
@@ -269,7 +316,22 @@ object AdminService {
                 row[description] = resolvedDescription
             }
 
-            requestRow[ModificationRequestsTable.bookingId]
+            Triple(
+                requestRow[ModificationRequestsTable.bookingId],
+                requestRow[ModificationRequestsTable.requestType],
+                resolvedDescription,
+            )
+        }
+        val bookingId = resolved.first
+        val requestType = resolved.second
+        val description = resolved.third
+
+        if (decision == "approved") {
+            BookingService.applyApprovedRequest(
+                bookingId = bookingId,
+                requestType = requestType,
+                description = description,
+            )
         }
 
         return BookingService.getAllBookingsForAdmin()

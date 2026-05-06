@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   adminGetBookings,
+  adminGetComplaints,
   adminGetMetrics,
   adminGetReports,
   adminResolveModificationRequest,
@@ -75,6 +76,7 @@ export function AdminDashboardPage({ onNavigate }) {
   const [bookings, setBookings] = useState([]);
   const [metrics, setMetrics] = useState(null);
   const [reports, setReports] = useState(null);
+  const [complaints, setComplaints] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [decisionNotes, setDecisionNotes] = useState({});
@@ -145,6 +147,21 @@ export function AdminDashboardPage({ onNavigate }) {
     return () => { cancelled = true; };
   }, [tab, reports]);
 
+  useEffect(() => {
+    if (tab !== "complaints" || complaints) return;
+    let cancelled = false;
+
+    adminGetComplaints()
+      .then((data) => {
+        if (!cancelled) setComplaints(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+
+    return () => { cancelled = true; };
+  }, [tab, complaints]);
+
   function handleLogout() {
     localStorage.removeItem("adminToken");
     onNavigate("home");
@@ -213,6 +230,7 @@ export function AdminDashboardPage({ onNavigate }) {
             ["bookings", "Bookings"],
             ["reports", "Reports"],
             ["modifications", "Modifications"],
+            ["complaints", "Complaints"],
           ].map(([key, label]) => (
             <button
               key={key}
@@ -222,6 +240,9 @@ export function AdminDashboardPage({ onNavigate }) {
               {label}
               {key === "modifications" && modifications.length > 0 && (
                 <span className="admin-badge">{modifications.length}</span>
+              )}
+              {key === "complaints" && (complaints?.length || 0) > 0 && (
+                <span className="admin-badge">{complaints.length}</span>
               )}
             </button>
           ))}
@@ -530,6 +551,57 @@ export function AdminDashboardPage({ onNavigate }) {
                 <MetricCard icon="Confirmed" value={bookings.filter((booking) => booking.status === "Confirmed").length} label="Confirmed" />
               </div>
             </div>
+          </div>
+        )}
+
+        {!loading && !error && tab === "complaints" && (
+          <div className="modifications-section">
+            <h2>Customer Complaints</h2>
+            <p className="section-subtitle">
+              Review submitted complaints from customers and follow up by booking reference.
+            </p>
+
+            {!complaints && <LoadingSpinner message="Loading complaints..." />}
+
+            {complaints && complaints.length === 0 && (
+              <div className="empty-state">
+                <span className="empty-icon">✓</span>
+                <p>No complaints submitted yet.</p>
+              </div>
+            )}
+
+            {complaints && complaints.length > 0 && (
+              <div className="admin-table-wrapper">
+                <div className="admin-table-header" style={{ gridTemplateColumns: "0.7fr 1fr 1fr 0.8fr 0.9fr 1.8fr" }}>
+                  <span>ID</span>
+                  <span>Customer</span>
+                  <span>Booking</span>
+                  <span>Status</span>
+                  <span>Submitted</span>
+                  <span>Complaint</span>
+                </div>
+                {complaints.map((complaint) => (
+                  <div className="admin-table-row" style={{ gridTemplateColumns: "0.7fr 1fr 1fr 0.8fr 0.9fr 1.8fr" }} key={complaint.id}>
+                    <span className="ref-value">CMP{String(complaint.id).padStart(6, "0")}</span>
+                    <span>
+                      <strong>{complaint.customerName || "Guest customer"}</strong>
+                      <br />
+                      <small>{complaint.customerEmail || "-"}</small>
+                    </span>
+                    <span>{complaint.bookingReference || "Not provided"}</span>
+                    <span className={`status-badge status-${String(complaint.status || "open").toLowerCase()}`}>
+                      {complaint.status || "Open"}
+                    </span>
+                    <span>{complaint.createdAt ? new Date(complaint.createdAt).toLocaleString("en-GB") : "-"}</span>
+                    <span>
+                      <strong>{complaint.subject || "General complaint"}</strong>
+                      <br />
+                      <small>{complaint.message || "No details provided."}</small>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
