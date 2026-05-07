@@ -11,8 +11,8 @@ import flightbooking.db.table.AirportsTable
 import flightbooking.db.table.FlightSchedulesTable
 import flightbooking.db.table.ScheduledFlightsTable
 import kotlinx.coroutines.withTimeoutOrNull
-import flightbooking.service.Airport as ApiAirport
 import org.jetbrains.exposed.sql.selectAll
+import flightbooking.service.Airport as ApiAirport
 
 object HomeService {
     private const val destinationCacheTtlMs = 5 * 60 * 1000L
